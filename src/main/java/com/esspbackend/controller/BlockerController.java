@@ -37,6 +37,9 @@ public class BlockerController {
     @Autowired
     private TalukaRepository talukaRepository;
 
+    @Autowired
+    private AlertRepository alertRepository;
+
     // ==================== CREATE ====================
     
     @PostMapping
@@ -46,6 +49,20 @@ public class BlockerController {
             blocker.setUpdatedAt(LocalDateTime.now());
             blocker.setStatus("NEW");
             Blocker savedBlocker = blockerRepository.save(blocker);
+            
+            // Create Alert for Sachiv
+            School school = schoolRepository.findById(savedBlocker.getSchoolId()).orElse(null);
+            if (school != null) {
+                Alert alert = new Alert();
+                alert.setTitle("New Blocker Reported: " + savedBlocker.getTitle());
+                alert.setMessage("A new blocker has been reported for school " + school.getName() + ".");
+                alert.setType("CRITICAL");
+                alert.setCategory("BLOCKER");
+                alert.setRole(Role.SACHIV);
+                alert.setTalukaId(school.getTalukaId());
+                alert.setRelatedId(savedBlocker.getId());
+                alertRepository.save(alert);
+            }
             
             // Add initial comment
             BlockerComment comment = new BlockerComment();

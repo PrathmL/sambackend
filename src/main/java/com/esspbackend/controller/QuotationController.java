@@ -4,8 +4,11 @@ import com.esspbackend.dto.QuotationDTO;
 import com.esspbackend.entity.Quotation;
 import com.esspbackend.entity.WorkRequest;
 import com.esspbackend.entity.WorkRequestStatus;
+import com.esspbackend.entity.Alert;
+import com.esspbackend.entity.Role;
 import com.esspbackend.repository.QuotationRepository;
 import com.esspbackend.repository.WorkRequestRepository;
+import com.esspbackend.repository.AlertRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +31,9 @@ public class QuotationController {
     
     @Autowired
     private WorkRequestRepository workRequestRepository;
+
+    @Autowired
+    private AlertRepository alertRepository;
 
     @GetMapping("/pending/{schoolId}")
     public ResponseEntity<List<QuotationDTO>> getPendingQuotations(@PathVariable Long schoolId) {
@@ -89,6 +95,16 @@ public class QuotationController {
             quotation.setSubmittedAt(LocalDateTime.now());
             
             Quotation saved = quotationRepository.save(quotation);
+            
+            // Create Alert for Admin
+            Alert alert = new Alert();
+            alert.setTitle("New Quotation Submitted");
+            alert.setMessage("A new quotation has been prepared for request #" + workRequestId + " and needs approval.");
+            alert.setType("WARNING");
+            alert.setCategory("WORK_REQUEST");
+            alert.setRole(Role.ADMIN);
+            alert.setRelatedId(saved.getId());
+            alertRepository.save(alert);
             
             // Update work request status
             workRequest.setStatus(WorkRequestStatus.PENDING_APPROVAL);

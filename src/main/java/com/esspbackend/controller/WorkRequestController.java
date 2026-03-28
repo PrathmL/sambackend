@@ -38,6 +38,9 @@ public class WorkRequestController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private AlertRepository alertRepository;
+
     private final String UPLOAD_DIR = "uploads/work-requests/";
 
     // Create new work request with photos
@@ -71,6 +74,17 @@ public class WorkRequestController {
             workRequest.setStatus(WorkRequestStatus.PENDING_QUOTATION);
             
             WorkRequest savedRequest = workRequestRepository.save(workRequest);
+            
+            // Create Alert for Clerk
+            Alert alert = new Alert();
+            alert.setTitle("New Work Request: " + title);
+            alert.setMessage("A new work request has been submitted and needs quotation.");
+            alert.setType("INFO");
+            alert.setCategory("WORK_REQUEST");
+            alert.setRole(Role.CLERK);
+            alert.setSchoolId(schoolId);
+            alert.setRelatedId(savedRequest.getId());
+            alertRepository.save(alert);
             
             // Save photos
             if (photos != null && photos.length > 0) {

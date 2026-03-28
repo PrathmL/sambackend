@@ -63,6 +63,12 @@ public class Blocker {
     @Column(name = "escalation_reason", columnDefinition = "TEXT")
     private String escalationReason;
 
+    @Column(name = "duplicate_of_id")
+    private Long duplicateOfId;
+
+    @Column(name = "target_date")
+    private LocalDateTime targetDate;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -143,6 +149,12 @@ public class Blocker {
     
     public String getEscalationReason() { return escalationReason; }
     public void setEscalationReason(String escalationReason) { this.escalationReason = escalationReason; }
+    
+    public Long getDuplicateOfId() { return duplicateOfId; }
+    public void setDuplicateOfId(Long duplicateOfId) { this.duplicateOfId = duplicateOfId; }
+    
+    public LocalDateTime getTargetDate() { return targetDate; }
+    public void setTargetDate(LocalDateTime targetDate) { this.targetDate = targetDate; }
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

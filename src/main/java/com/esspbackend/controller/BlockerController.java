@@ -71,6 +71,7 @@ public class BlockerController {
     @GetMapping
     public ResponseEntity<List<BlockerDTO>> getBlockers(
             @RequestParam(required = false) Long schoolId,
+            @RequestParam(required = false) Long talukaId,
             @RequestParam(required = false) Long workId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String type,
@@ -80,6 +81,8 @@ public class BlockerController {
         
         if (schoolId != null) {
             blockers = blockerRepository.findBySchoolIdOrderByCreatedAtDesc(schoolId);
+        } else if (talukaId != null) {
+            blockers = blockerRepository.findByTalukaId(talukaId);
         } else if (workId != null) {
             blockers = blockerRepository.findByWorkIdOrderByCreatedAtDesc(workId);
         } else if (status != null) {
@@ -194,25 +197,67 @@ public class BlockerController {
         
         return blockerRepository.findById(id)
                 .map(blocker -> {
-                    Long assignedToId = Long.valueOf(body.get("assignedToId").toString());
-                    String assignedToRole = (String) body.get("assignedToRole");
-                    String status = "IN_PROGRESS";
-                    
-                    blockerRepository.assignBlocker(id, status, assignedToId, assignedToRole);
-                    
-                    // Add comment
-                    BlockerComment comment = new BlockerComment();
-                    comment.setBlockerId(id);
-                    comment.setComment("Assigned to " + assignedToRole + " for resolution");
-                    comment.setCommentedById(Long.valueOf(body.get("assignedBy").toString()));
-                    comment.setCommentedByRole((String) body.get("assignedByRole"));
-                    comment.setCommentedByName(getUserName(Long.valueOf(body.get("assignedBy").toString())));
-                    comment.setIsInternal(false);
-                    blockerCommentRepository.save(comment);
-                    
-                    Map<String, String> response = new HashMap<>();
-                    response.put("message", "Blocker assigned successfully");
-                    return ResponseEntity.ok(response);
+                    try {
+                        Object assignedToIdObj = body.get("assignedToId");
+                        if (assignedToIdObj == null || assignedToIdObj.toString().isEmpty()) {
+                            Map<String, String> error = new HashMap<>();
+                            error.put("error", "Assigned user is required");
+                            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+                        }
+                        
+                        Long assignedToId = Long.valueOf(assignedToIdObj.toString());
+                        String assignedToRole = (String) body.getOrDefault("assignedToRole", "SACHIV");
+                        String status = "IN_PROGRESS";
+                        
+                        LocalDateTime targetDate = null;
+                        Object targetDateObj = body.get("targetDate");
+                        if (targetDateObj != null && !targetDateObj.toString().isEmpty()) {
+                            String dateStr = targetDateObj.toString();
+                            try {
+                                if (dateStr.length() == 10) { // YYYY-MM-DD
+                                    targetDate = java.time.LocalDate.parse(dateStr).atStartOfDay();
+                                } else {
+                                    targetDate = LocalDateTime.parse(dateStr);
+                                }
+                            } catch (Exception e) {
+                                System.err.println("Failed to parse target date: " + dateStr);
+                            }
+                        }
+                        
+                        blockerRepository.assignBlocker(id, status, assignedToId, assignedToRole, targetDate);
+                        
+                        // Add comment
+                        BlockerComment comment = new BlockerComment();
+                        comment.setBlockerId(id);
+                        String commentText = "Assigned to " + assignedToRole + " for resolution.";
+                        if (targetDate != null) {
+                            commentText += " Target Date: " + targetDate.toLocalDate();
+                        }
+                        if (body.get("notes") != null && !body.get("notes").toString().isEmpty()) {
+                            commentText += " Notes: " + body.get("notes").toString();
+                        }
+                        comment.setComment(commentText);
+                        
+                        Object assignedByObj = body.get("assignedBy");
+                        if (assignedByObj != null) {
+                            Long assignedById = Long.valueOf(assignedByObj.toString());
+                            comment.setCommentedById(assignedById);
+                            comment.setCommentedByRole((String) body.get("assignedByRole"));
+                            comment.setCommentedByName(getUserName(assignedById));
+                        }
+                        
+                        comment.setIsInternal(false);
+                        blockerCommentRepository.save(comment);
+                        
+                        Map<String, String> response = new HashMap<>();
+                        response.put("message", "Blocker assigned successfully");
+                        return ResponseEntity.ok(response);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Map<String, String> error = new HashMap<>();
+                        error.put("error", "Internal server error: " + e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+                    }
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -269,6 +314,60 @@ public class BlockerController {
                     
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Blocker escalated successfully");
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @PutMapping("/{id}/priority")
+    public ResponseEntity<?> updatePriority(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        
+        return blockerRepository.findById(id)
+                .map(blocker -> {
+                    String priority = body.get("priority");
+                    blockerRepository.updatePriority(id, priority);
+                    
+                    // Add comment
+                    BlockerComment comment = new BlockerComment();
+                    comment.setBlockerId(id);
+                    comment.setComment("Priority changed to " + priority);
+                    comment.setCommentedById(Long.valueOf(body.get("updatedById")));
+                    comment.setCommentedByRole(body.get("updatedByRole"));
+                    comment.setCommentedByName(getUserName(Long.valueOf(body.get("updatedById"))));
+                    comment.setIsInternal(false);
+                    blockerCommentRepository.save(comment);
+                    
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Priority updated successfully");
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @PutMapping("/{id}/duplicate")
+    public ResponseEntity<?> markDuplicate(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        
+        return blockerRepository.findById(id)
+                .map(blocker -> {
+                    Long duplicateOfId = Long.valueOf(body.get("duplicateOfId"));
+                    blockerRepository.markDuplicate(id, duplicateOfId);
+                    
+                    // Add comment
+                    BlockerComment comment = new BlockerComment();
+                    comment.setBlockerId(id);
+                    comment.setComment("Marked as duplicate of Blocker #" + duplicateOfId);
+                    comment.setCommentedById(Long.valueOf(body.get("updatedById")));
+                    comment.setCommentedByRole(body.get("updatedByRole"));
+                    comment.setCommentedByName(getUserName(Long.valueOf(body.get("updatedById"))));
+                    comment.setIsInternal(false);
+                    blockerCommentRepository.save(comment);
+                    
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Blocker marked as duplicate");
                     return ResponseEntity.ok(response);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -332,8 +431,17 @@ public class BlockerController {
         dto.setResolvedAt(blocker.getResolvedAt());
         dto.setEscalatedAt(blocker.getEscalatedAt());
         dto.setEscalationReason(blocker.getEscalationReason());
+        dto.setDuplicateOfId(blocker.getDuplicateOfId());
+        dto.setTargetDate(blocker.getTargetDate());
         dto.setCreatedAt(blocker.getCreatedAt());
         dto.setUpdatedAt(blocker.getUpdatedAt());
+        
+        // Get duplicate title
+        if (blocker.getDuplicateOfId() != null) {
+            blockerRepository.findById(blocker.getDuplicateOfId()).ifPresent(dup -> {
+                dto.setDuplicateOfTitle(dup.getTitle());
+            });
+        }
         
         // Get work details
         workRepository.findById(blocker.getWorkId()).ifPresent(work -> {

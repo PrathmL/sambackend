@@ -28,6 +28,9 @@ public class BlockerDTO {
     private LocalDateTime escalatedAt;
     private String escalatedTo;
     private String escalationReason;
+    private Long duplicateOfId;
+    private String duplicateOfTitle;
+    private LocalDateTime targetDate;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<BlockerCommentDTO> comments;
@@ -106,6 +109,15 @@ public class BlockerDTO {
     
     public String getEscalationReason() { return escalationReason; }
     public void setEscalationReason(String escalationReason) { this.escalationReason = escalationReason; }
+    
+    public Long getDuplicateOfId() { return duplicateOfId; }
+    public void setDuplicateOfId(Long duplicateOfId) { this.duplicateOfId = duplicateOfId; }
+    
+    public String getDuplicateOfTitle() { return duplicateOfTitle; }
+    public void setDuplicateOfTitle(String duplicateOfTitle) { this.duplicateOfTitle = duplicateOfTitle; }
+    
+    public LocalDateTime getTargetDate() { return targetDate; }
+    public void setTargetDate(LocalDateTime targetDate) { this.targetDate = targetDate; }
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

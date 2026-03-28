@@ -66,11 +66,24 @@ public interface BlockerRepository extends JpaRepository<Blocker, Long> {
     @Query("SELECT AVG(DATEDIFF(b.resolvedAt, b.createdAt)) FROM Blocker b WHERE b.resolvedAt IS NOT NULL AND b.createdAt >= :startDate")
     Double getAverageResolutionTimeDays(@Param("startDate") LocalDateTime startDate);
     
+    @Query("SELECT b FROM Blocker b JOIN School s ON b.schoolId = s.id WHERE s.talukaId = :talukaId ORDER BY b.createdAt DESC")
+    List<Blocker> findByTalukaId(@Param("talukaId") Long talukaId);
+    
     // Update methods
     @Modifying
     @Transactional
-    @Query("UPDATE Blocker b SET b.status = :status, b.assignedToId = :assignedToId, b.assignedToRole = :assignedToRole WHERE b.id = :id")
-    void assignBlocker(@Param("id") Long id, @Param("status") String status, @Param("assignedToId") Long assignedToId, @Param("assignedToRole") String assignedToRole);
+    @Query("UPDATE Blocker b SET b.status = :status, b.assignedToId = :assignedToId, b.assignedToRole = :assignedToRole, b.targetDate = :targetDate WHERE b.id = :id")
+    void assignBlocker(@Param("id") Long id, @Param("status") String status, @Param("assignedToId") Long assignedToId, @Param("assignedToRole") String assignedToRole, @Param("targetDate") LocalDateTime targetDate);
+    
+    @Modifying
+    @Transactional
+    @Query("UPDATE Blocker b SET b.priority = :priority WHERE b.id = :id")
+    void updatePriority(@Param("id") Long id, @Param("priority") String priority);
+    
+    @Modifying
+    @Transactional
+    @Query("UPDATE Blocker b SET b.status = 'DUPLICATE', b.duplicateOfId = :duplicateOfId WHERE b.id = :id")
+    void markDuplicate(@Param("id") Long id, @Param("duplicateOfId") Long duplicateOfId);
     
     @Modifying
     @Transactional

@@ -337,16 +337,8 @@ public class WorkController {
             double totalUtilized = (work.getTotalUtilized() != null ? work.getTotalUtilized() : 0) 
                     + materialCost + laborCost + otherCost;
             work.setTotalUtilized(totalUtilized);
-            work.setProgressPercentage(progressPercentage);
-            work.setLastUpdateAt(LocalDateTime.now());
             
-            if (progressPercentage >= 100) {
-                work.setStatus("COMPLETED");
-                work.setCompletedAt(LocalDateTime.now());
-            }
-            
-            workRepository.save(work);
-            
+            // If updating a specific stage, recalculate overall progress based on weights
             if (stageId != null) {
                 workStageRepository.findById(stageId).ifPresent(stage -> {
                     stage.setProgressPercentage(progressPercentage);
@@ -357,14 +349,36 @@ public class WorkController {
                             long days = java.time.Duration.between(stage.getStartedAt(), LocalDateTime.now()).toDays();
                             stage.setActualDurationDays((int) days);
                         }
-                    } else if (progressPercentage > 0 && stage.getStartedAt() == null) {
+                    } else if (progressPercentage > 0) {
                         stage.setStatus("IN_PROGRESS");
-                        stage.setStartedAt(LocalDateTime.now());
+                        if (stage.getStartedAt() == null) {
+                            stage.setStartedAt(LocalDateTime.now());
+                        }
                     }
                     stage.setRemarks(remarks);
                     workStageRepository.save(stage);
                 });
+                
+                // Recalculate overall work progress: Sum of (stage_progress * stage_weightage / 100)
+                List<WorkStage> allStages = workStageRepository.findByWorkId(workId);
+                double calculatedProgress = 0;
+                for (WorkStage s : allStages) {
+                    calculatedProgress += (s.getProgressPercentage() * s.getWeightage()) / 100.0;
+                }
+                work.setProgressPercentage((int) Math.round(calculatedProgress));
+            } else {
+                // If no stageId, maintain current behavior: set overall progress directly
+                work.setProgressPercentage(progressPercentage);
             }
+            
+            work.setLastUpdateAt(LocalDateTime.now());
+            
+            if (work.getProgressPercentage() >= 100) {
+                work.setStatus("COMPLETED");
+                work.setCompletedAt(LocalDateTime.now());
+            }
+            
+            workRepository.save(work);
             
             Map<String, String> response = new HashMap<>();
             response.put("message", "Progress updated successfully");

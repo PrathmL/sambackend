@@ -373,6 +373,33 @@ public class BlockerController {
                 .orElse(ResponseEntity.notFound().build());
     }
     
+    @PutMapping("/{id}/request-info")
+    public ResponseEntity<?> requestInfo(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        
+        return blockerRepository.findById(id)
+                .map(blocker -> {
+                    blocker.setStatus("INFO_REQUESTED");
+                    blockerRepository.save(blocker);
+                    
+                    // Add comment
+                    BlockerComment comment = new BlockerComment();
+                    comment.setBlockerId(id);
+                    comment.setComment("Additional information requested: " + body.get("notes"));
+                    comment.setCommentedById(Long.valueOf(body.get("requestedById")));
+                    comment.setCommentedByRole(body.get("requestedByRole"));
+                    comment.setCommentedByName(getUserName(Long.valueOf(body.get("requestedById"))));
+                    comment.setIsInternal(false);
+                    blockerCommentRepository.save(comment);
+                    
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Information requested successfully");
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PostMapping("/{id}/comments")
     public ResponseEntity<?> addComment(
             @PathVariable Long id,

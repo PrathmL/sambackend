@@ -22,6 +22,9 @@ public class BlockerComment {
     @Column(name = "commented_by_role")
     private String commentedByRole;
 
+    @Column(name = "commented_by_name")
+    private String commentedByName;
+
     @Column(name = "is_internal")
     private Boolean isInternal = false;
 
@@ -38,16 +41,25 @@ public class BlockerComment {
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+    
     public Long getBlockerId() { return blockerId; }
     public void setBlockerId(Long blockerId) { this.blockerId = blockerId; }
+    
     public String getComment() { return comment; }
     public void setComment(String comment) { this.comment = comment; }
+    
     public Long getCommentedById() { return commentedById; }
     public void setCommentedById(Long commentedById) { this.commentedById = commentedById; }
+    
     public String getCommentedByRole() { return commentedByRole; }
     public void setCommentedByRole(String commentedByRole) { this.commentedByRole = commentedByRole; }
+    
+    public String getCommentedByName() { return commentedByName; }
+    public void setCommentedByName(String commentedByName) { this.commentedByName = commentedByName; }
+    
     public Boolean getIsInternal() { return isInternal; }
     public void setIsInternal(Boolean isInternal) { this.isInternal = isInternal; }
+    
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

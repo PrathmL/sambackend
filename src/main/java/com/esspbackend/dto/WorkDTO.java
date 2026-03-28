@@ -9,6 +9,8 @@ public class WorkDTO {
     private String title;
     private String description;
     private String type;
+    private Long schoolId;
+    private String schoolName;
     private Double sanctionedAmount;
     private Double totalUtilized;
     private Integer progressPercentage;
@@ -37,6 +39,12 @@ public class WorkDTO {
     
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
+    
+    public Long getSchoolId() { return schoolId; }
+    public void setSchoolId(Long schoolId) { this.schoolId = schoolId; }
+    
+    public String getSchoolName() { return schoolName; }
+    public void setSchoolName(String schoolName) { this.schoolName = schoolName; }
     
     public Double getSanctionedAmount() { return sanctionedAmount; }
     public void setSanctionedAmount(Double sanctionedAmount) { this.sanctionedAmount = sanctionedAmount; }

@@ -66,8 +66,25 @@ public class WorkController {
     @GetMapping("/school/{schoolId}")
     public ResponseEntity<List<WorkDTO>> getWorksBySchool(@PathVariable Long schoolId) {
         List<Work> works = workRepository.findBySchoolIdOrderByCreatedAtDesc(schoolId);
-        System.out.println("Works found for school " + schoolId + ": " + works.size());
-        works.forEach(w -> System.out.println("Work: " + w.getId() + " - " + w.getTitle() + " - Status: " + w.getStatus()));
+        List<WorkDTO> dtos = works.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+    
+    @GetMapping("/taluka/{talukaId}")
+    public ResponseEntity<List<WorkDTO>> getWorksByTaluka(@PathVariable Long talukaId) {
+        // Get all schools in this taluka
+        List<School> schools = schoolRepository.findByTalukaId(talukaId);
+        List<Long> schoolIds = schools.stream().map(School::getId).collect(Collectors.toList());
+        
+        // Get all works for these schools
+        List<Work> works = new ArrayList<>();
+        for (Long schoolId : schoolIds) {
+            works.addAll(workRepository.findBySchoolId(schoolId));
+        }
+        works.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        
         List<WorkDTO> dtos = works.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
@@ -190,7 +207,6 @@ public class WorkController {
             work.setLastUpdateAt(LocalDateTime.now());
             
             Work savedWork = workRepository.save(work);
-            System.out.println("Work created with ID: " + savedWork.getId() + ", Status: " + savedWork.getStatus());
             
             // Create stages
             List<WorkStage> stages = new ArrayList<>();
@@ -259,7 +275,6 @@ public class WorkController {
             work.setLastUpdateAt(LocalDateTime.now());
             
             Work saved = workRepository.save(work);
-            System.out.println("Simple work created with ID: " + saved.getId() + ", Status: " + saved.getStatus());
             return ResponseEntity.ok(convertToDTO(saved));
         } catch (Exception e) {
             Map<String, String> error = new HashMap<>();
@@ -506,6 +521,7 @@ public class WorkController {
         dto.setTitle(work.getTitle());
         dto.setDescription(work.getDescription());
         dto.setType(work.getType());
+        dto.setSchoolId(work.getSchoolId());
         dto.setSanctionedAmount(work.getSanctionedAmount());
         dto.setTotalUtilized(work.getTotalUtilized());
         dto.setProgressPercentage(work.getProgressPercentage());
@@ -514,6 +530,11 @@ public class WorkController {
         dto.setActivatedAt(work.getActivatedAt());
         dto.setCompletedAt(work.getCompletedAt());
         dto.setLastUpdateAt(work.getLastUpdateAt());
+        
+        // Get school name
+        schoolRepository.findById(work.getSchoolId()).ifPresent(school -> {
+            dto.setSchoolName(school.getName());
+        });
         
         List<WorkStage> stages = workStageRepository.findByWorkIdOrderByIdAsc(work.getId());
         List<WorkStageDTO> stageDTOs = stages.stream()

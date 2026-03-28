@@ -52,6 +52,9 @@ public class Work {
     @Column(name = "last_update_at")
     private LocalDateTime lastUpdateAt;
 
+    @Column(name = "internal_notes", columnDefinition = "TEXT")
+    private String internalNotes;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -98,4 +101,7 @@ public class Work {
     public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
     public LocalDateTime getLastUpdateAt() { return lastUpdateAt; }
     public void setLastUpdateAt(LocalDateTime lastUpdateAt) { this.lastUpdateAt = lastUpdateAt; }
+
+    public String getInternalNotes() { return internalNotes; }
+    public void setInternalNotes(String internalNotes) { this.internalNotes = internalNotes; }
 }

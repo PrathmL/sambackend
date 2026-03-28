@@ -438,6 +438,20 @@ public class WorkController {
                 .orElse(ResponseEntity.notFound().build());
     }
     
+    @PostMapping("/{id}/notes")
+    public ResponseEntity<?> saveInternalNotes(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return workRepository.findById(id)
+                .map(work -> {
+                    work.setInternalNotes(body.get("notes"));
+                    workRepository.save(work);
+                    
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Internal notes saved successfully");
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
     @PostMapping("/{id}/mark-complete")
     public ResponseEntity<?> markWorkComplete(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return workRepository.findById(id)
@@ -530,6 +544,7 @@ public class WorkController {
         dto.setActivatedAt(work.getActivatedAt());
         dto.setCompletedAt(work.getCompletedAt());
         dto.setLastUpdateAt(work.getLastUpdateAt());
+        dto.setInternalNotes(work.getInternalNotes());
         
         // Get school name
         schoolRepository.findById(work.getSchoolId()).ifPresent(school -> {

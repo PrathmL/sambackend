@@ -19,6 +19,7 @@ public class WorkDTO {
     private LocalDateTime activatedAt;
     private LocalDateTime completedAt;
     private LocalDateTime lastUpdateAt;
+    private String internalNotes;
     private List<WorkStageDTO> stages;
     private List<WorkProgressUpdateDTO> progressUpdates;
 
@@ -69,6 +70,9 @@ public class WorkDTO {
     
     public LocalDateTime getLastUpdateAt() { return lastUpdateAt; }
     public void setLastUpdateAt(LocalDateTime lastUpdateAt) { this.lastUpdateAt = lastUpdateAt; }
+    
+    public String getInternalNotes() { return internalNotes; }
+    public void setInternalNotes(String internalNotes) { this.internalNotes = internalNotes; }
     
     public List<WorkStageDTO> getStages() { return stages; }
     public void setStages(List<WorkStageDTO> stages) { this.stages = stages; }

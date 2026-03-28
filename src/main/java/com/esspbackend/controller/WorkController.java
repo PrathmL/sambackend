@@ -1,6 +1,6 @@
 package com.esspbackend.controller;
 
-import com.esspbackend.dto.WorkCompletionRequest;
+import com.esspbackend.dto.WorkCreationRequest;
 import com.esspbackend.dto.WorkDTO;
 import com.esspbackend.dto.WorkProgressUpdateDTO;
 import com.esspbackend.dto.WorkStageDTO;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/works")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 public class WorkController {
 
     @Autowired
@@ -42,38 +42,59 @@ public class WorkController {
     
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private WorkRequestRepository workRequestRepository;
+    
+    @Autowired
+    private FundSourceRepository fundSourceRepository;
 
     private final String UPLOAD_DIR = "uploads/work-progress/";
 
-   
- // Get works by school
+    // ==================== GET ENDPOINTS ====================
+    
     @GetMapping
-    public ResponseEntity<List<WorkDTO>> getWorks(
-            @RequestParam(required = false) Long schoolId,
-            @RequestParam(required = false) String status) {
-        
-        List<Work> works;
-        
-        if (schoolId != null && status != null) {
-            works = workRepository.findBySchoolIdAndStatus(schoolId, status);
-        } else if (schoolId != null) {
-            works = workRepository.findBySchoolIdOrderByCreatedAtDesc(schoolId);
-        } else if (status != null) {
-            works = workRepository.findByStatus(status);
-        } else {
-            works = workRepository.findAll();
-        }
-        
+    public ResponseEntity<List<WorkDTO>> getAllWorks() {
+        List<Work> works = workRepository.findAll();
+        works.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
         List<WorkDTO> dtos = works.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
-        
         return ResponseEntity.ok(dtos);
     }
     
+    @GetMapping("/school/{schoolId}")
+    public ResponseEntity<List<WorkDTO>> getWorksBySchool(@PathVariable Long schoolId) {
+        List<Work> works = workRepository.findBySchoolIdOrderByCreatedAtDesc(schoolId);
+        System.out.println("Works found for school " + schoolId + ": " + works.size());
+        works.forEach(w -> System.out.println("Work: " + w.getId() + " - " + w.getTitle() + " - Status: " + w.getStatus()));
+        List<WorkDTO> dtos = works.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
     
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<WorkDTO>> getWorksByStatus(@PathVariable String status) {
+        List<Work> works = workRepository.findByStatusOrderByCreatedAtDesc(status);
+        List<WorkDTO> dtos = works.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
     
-    // Get work by ID
+    @GetMapping("/school/{schoolId}/status/{status}")
+    public ResponseEntity<List<WorkDTO>> getWorksBySchoolAndStatus(
+            @PathVariable Long schoolId, 
+            @PathVariable String status) {
+        List<Work> works = workRepository.findBySchoolIdAndStatus(schoolId, status);
+        works.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        List<WorkDTO> dtos = works.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+    
     @GetMapping("/{id}")
     public ResponseEntity<?> getWorkById(@PathVariable Long id) {
         return workRepository.findById(id)
@@ -82,7 +103,173 @@ public class WorkController {
                 .orElse(ResponseEntity.notFound().build());
     }
     
-    // Update work progress
+    @GetMapping("/by-request/{requestId}")
+    public ResponseEntity<?> getWorkByRequestId(@PathVariable Long requestId) {
+        return workRepository.findByWorkRequestId(requestId)
+                .map(this::convertToDTO)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @GetMapping("/{id}/fund-sources")
+    public ResponseEntity<List<FundSource>> getFundSources(@PathVariable Long id) {
+        List<FundSource> fundSources = fundSourceRepository.findByWorkId(id);
+        return ResponseEntity.ok(fundSources);
+    }
+    
+    @GetMapping("/{id}/stages")
+    public ResponseEntity<List<WorkStage>> getStages(@PathVariable Long id) {
+        List<WorkStage> stages = workStageRepository.findByWorkIdOrderByIdAsc(id);
+        return ResponseEntity.ok(stages);
+    }
+    
+    @GetMapping("/{id}/progress-updates")
+    public ResponseEntity<List<WorkProgressUpdate>> getProgressUpdates(@PathVariable Long id) {
+        List<WorkProgressUpdate> updates = workProgressUpdateRepository.findByWorkIdOrderByUpdatedAtDesc(id);
+        return ResponseEntity.ok(updates);
+    }
+
+    // ==================== CREATE ENDPOINTS ====================
+    
+    @PostMapping("/create-from-request")
+    public ResponseEntity<?> createWorkFromRequest(@RequestBody WorkCreationRequest request) {
+        try {
+            // Validate total weightage is 100%
+            int totalWeightage = request.getStages().stream()
+                    .mapToInt(WorkCreationRequest.StageDTO::getWeightage)
+                    .sum();
+            if (totalWeightage != 100) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Total stage weightage must be 100%. Current total: " + totalWeightage + "%");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+            }
+            
+            // Validate total fund allocation equals sanctioned amount
+            double totalAllocated = request.getFundSources().stream()
+                    .mapToDouble(WorkCreationRequest.FundSourceDTO::getAmount)
+                    .sum();
+            if (Math.abs(totalAllocated - request.getSanctionedAmount()) > 0.01) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Total fund allocation (₹" + totalAllocated + 
+                        ") must equal sanctioned amount (₹" + request.getSanctionedAmount() + ")");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+            }
+            
+            // Get the work request
+            WorkRequest workRequest = workRequestRepository.findById(request.getWorkRequestId())
+                    .orElseThrow(() -> new RuntimeException("Work request not found"));
+            
+            // Get school details
+            School school = schoolRepository.findById(workRequest.getSchoolId())
+                    .orElseThrow(() -> new RuntimeException("School not found"));
+            
+            // Generate unique work code if not provided
+            String workCode = request.getWorkCode();
+            if (workCode == null || workCode.isEmpty()) {
+                workCode = generateWorkCode();
+            } else if (workRepository.existsByWorkCode(workCode)) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Work code already exists: " + workCode);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+            }
+            
+            // Create work with ACTIVE status
+            Work work = new Work();
+            work.setWorkCode(workCode);
+            work.setTitle(request.getTitle());
+            work.setDescription(request.getDescription());
+            work.setType(request.getType());
+            work.setWorkRequestId(request.getWorkRequestId());
+            work.setSchoolId(workRequest.getSchoolId());
+            work.setTalukaId(school.getTalukaId());
+            work.setSanctionedAmount(request.getSanctionedAmount());
+            work.setTotalUtilized(0.0);
+            work.setProgressPercentage(0);
+            work.setStatus("ACTIVE");
+            work.setActivatedAt(LocalDateTime.now());
+            work.setLastUpdateAt(LocalDateTime.now());
+            
+            Work savedWork = workRepository.save(work);
+            System.out.println("Work created with ID: " + savedWork.getId() + ", Status: " + savedWork.getStatus());
+            
+            // Create stages
+            List<WorkStage> stages = new ArrayList<>();
+            for (WorkCreationRequest.StageDTO stageDTO : request.getStages()) {
+                WorkStage stage = new WorkStage();
+                stage.setWorkId(savedWork.getId());
+                stage.setName(stageDTO.getName());
+                stage.setDescription(stageDTO.getDescription());
+                stage.setWeightage(stageDTO.getWeightage());
+                stage.setEstimatedDurationDays(stageDTO.getEstimatedDurationDays());
+                stage.setProgressPercentage(0);
+                stage.setStatus("PENDING");
+                
+                if (stageDTO.getEstimatedDurationDays() != null && stageDTO.getEstimatedDurationDays() > 0) {
+                    stage.setExpectedCompletionDate(LocalDateTime.now().plusDays(stageDTO.getEstimatedDurationDays()));
+                }
+                stages.add(stage);
+            }
+            workStageRepository.saveAll(stages);
+            
+            // Create fund sources
+            List<FundSource> fundSources = new ArrayList<>();
+            for (WorkCreationRequest.FundSourceDTO fundDTO : request.getFundSources()) {
+                FundSource fundSource = new FundSource();
+                fundSource.setWorkId(savedWork.getId());
+                fundSource.setSourceName(fundDTO.getSourceName());
+                fundSource.setAmount(fundDTO.getAmount());
+                fundSources.add(fundSource);
+            }
+            fundSourceRepository.saveAll(fundSources);
+            
+            // Update work request status
+            workRequest.setStatus(WorkRequestStatus.WORK_CREATED);
+            workRequestRepository.save(workRequest);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Work created and activated successfully");
+            response.put("workId", savedWork.getId());
+            response.put("workCode", savedWork.getWorkCode());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to create work: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+    
+    @PostMapping
+    public ResponseEntity<?> createWork(@RequestBody Work work) {
+        try {
+            if (work.getWorkCode() == null || work.getWorkCode().isEmpty()) {
+                work.setWorkCode(generateWorkCode());
+            } else if (workRepository.existsByWorkCode(work.getWorkCode())) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Work code already exists: " + work.getWorkCode());
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+            }
+            
+            work.setStatus("ACTIVE");
+            work.setProgressPercentage(0);
+            work.setTotalUtilized(0.0);
+            work.setActivatedAt(LocalDateTime.now());
+            work.setLastUpdateAt(LocalDateTime.now());
+            
+            Work saved = workRepository.save(work);
+            System.out.println("Simple work created with ID: " + saved.getId() + ", Status: " + saved.getStatus());
+            return ResponseEntity.ok(convertToDTO(saved));
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to create work: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    // ==================== UPDATE ENDPOINTS ====================
+    
     @PostMapping("/progress")
     public ResponseEntity<?> updateProgress(
             @RequestParam("workId") Long workId,
@@ -97,17 +284,14 @@ public class WorkController {
             @RequestParam(value = "photos", required = false) MultipartFile[] photos) {
         
         try {
-            // Create directory if not exists
             Path uploadPath = Paths.get(UPLOAD_DIR);
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
             
-            // Get work
             Work work = workRepository.findById(workId)
                     .orElseThrow(() -> new RuntimeException("Work not found"));
             
-            // Create progress update
             WorkProgressUpdate update = new WorkProgressUpdate();
             update.setWorkId(workId);
             update.setStageId(stageId);
@@ -121,7 +305,6 @@ public class WorkController {
             
             WorkProgressUpdate savedUpdate = workProgressUpdateRepository.save(update);
             
-            // Save photos
             if (photos != null && photos.length > 0) {
                 for (int i = 0; i < photos.length; i++) {
                     MultipartFile photo = photos[i];
@@ -136,26 +319,34 @@ public class WorkController {
                 }
             }
             
-            // Update work total utilized and progress
-            double totalUtilized = work.getTotalUtilized() + materialCost + laborCost + otherCost;
+            double totalUtilized = (work.getTotalUtilized() != null ? work.getTotalUtilized() : 0) 
+                    + materialCost + laborCost + otherCost;
             work.setTotalUtilized(totalUtilized);
             work.setProgressPercentage(progressPercentage);
             work.setLastUpdateAt(LocalDateTime.now());
+            
+            if (progressPercentage >= 100) {
+                work.setStatus("COMPLETED");
+                work.setCompletedAt(LocalDateTime.now());
+            }
+            
             workRepository.save(work);
             
-            // Update stage progress if stageId provided
             if (stageId != null) {
                 workStageRepository.findById(stageId).ifPresent(stage -> {
                     stage.setProgressPercentage(progressPercentage);
                     if (progressPercentage >= 100) {
                         stage.setStatus("COMPLETED");
                         stage.setCompletedAt(LocalDateTime.now());
-                    } else if (progressPercentage > 0) {
-                        stage.setStatus("IN_PROGRESS");
-                        if (stage.getStartedAt() == null) {
-                            stage.setStartedAt(LocalDateTime.now());
+                        if (stage.getActualDurationDays() == null && stage.getStartedAt() != null) {
+                            long days = java.time.Duration.between(stage.getStartedAt(), LocalDateTime.now()).toDays();
+                            stage.setActualDurationDays((int) days);
                         }
+                    } else if (progressPercentage > 0 && stage.getStartedAt() == null) {
+                        stage.setStatus("IN_PROGRESS");
+                        stage.setStartedAt(LocalDateTime.now());
                     }
+                    stage.setRemarks(remarks);
                     workStageRepository.save(stage);
                 });
             }
@@ -172,11 +363,76 @@ public class WorkController {
         }
     }
     
-    // Mark work as complete
-    @PostMapping("/mark-complete")
-    public ResponseEntity<?> markWorkComplete(@RequestBody WorkCompletionRequest request) {
-        return workRepository.findById(request.getWorkId())
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateWork(@PathVariable Long id, @RequestBody Work workDetails) {
+        return workRepository.findById(id)
                 .map(work -> {
+                    work.setTitle(workDetails.getTitle());
+                    work.setDescription(workDetails.getDescription());
+                    work.setType(workDetails.getType());
+                    work.setSanctionedAmount(workDetails.getSanctionedAmount());
+                    Work updated = workRepository.save(work);
+                    return ResponseEntity.ok(convertToDTO(updated));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // ==================== WORK STATUS ENDPOINTS ====================
+    
+    @PostMapping("/{id}/activate")
+    public ResponseEntity<?> activateWork(@PathVariable Long id) {
+        return workRepository.findById(id)
+                .map(work -> {
+                    work.setStatus("ACTIVE");
+                    work.setActivatedAt(LocalDateTime.now());
+                    work.setLastUpdateAt(LocalDateTime.now());
+                    workRepository.save(work);
+                    
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Work activated successfully");
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @PostMapping("/{id}/suspend")
+    public ResponseEntity<?> suspendWork(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return workRepository.findById(id)
+                .map(work -> {
+                    work.setStatus("ON_HOLD");
+                    workRepository.save(work);
+                    
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Work suspended: " + body.getOrDefault("reason", "No reason provided"));
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @PostMapping("/{id}/resume")
+    public ResponseEntity<?> resumeWork(@PathVariable Long id) {
+        return workRepository.findById(id)
+                .map(work -> {
+                    work.setStatus("ACTIVE");
+                    workRepository.save(work);
+                    
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Work resumed");
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @PostMapping("/{id}/mark-complete")
+    public ResponseEntity<?> markWorkComplete(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return workRepository.findById(id)
+                .map(work -> {
+                    if (work.getProgressPercentage() < 100) {
+                        Map<String, String> error = new HashMap<>();
+                        error.put("error", "Work progress is " + work.getProgressPercentage() + "%. Complete all stages first.");
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+                    }
+                    
                     work.setStatus("PENDING_CLOSURE");
                     work.setCompletedAt(LocalDateTime.now());
                     workRepository.save(work);
@@ -186,6 +442,61 @@ public class WorkController {
                     return ResponseEntity.ok(response);
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+    
+    @PostMapping("/{id}/verify")
+    public ResponseEntity<?> verifyWork(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return workRepository.findById(id)
+                .map(work -> {
+                    if (!"PENDING_CLOSURE".equals(work.getStatus())) {
+                        Map<String, String> error = new HashMap<>();
+                        error.put("error", "Work must be in PENDING_CLOSURE status to verify");
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+                    }
+                    
+                    work.setStatus("COMPLETED");
+                    workRepository.save(work);
+                    
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Work verified and closed successfully");
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // ==================== DELETE ENDPOINTS ====================
+    
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteWork(@PathVariable Long id) {
+        return workRepository.findById(id)
+                .map(work -> {
+                    work.setStatus("DELETED");
+                    workRepository.save(work);
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Work deleted successfully");
+                    return ResponseEntity.ok(response);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // ==================== HELPER METHODS ====================
+    
+    private String generateWorkCode() {
+        String prefix = "WRK";
+        String year = String.valueOf(LocalDateTime.now().getYear()).substring(2);
+        String maxCode = workRepository.findMaxWorkCodeByPrefix(prefix + year);
+        
+        int nextNumber = 1;
+        if (maxCode != null && maxCode.length() >= 8) {
+            try {
+                String numPart = maxCode.substring(6);
+                nextNumber = Integer.parseInt(numPart) + 1;
+            } catch (NumberFormatException e) {
+                nextNumber = 1;
+            }
+        }
+        
+        return String.format("%s%s%04d", prefix, year, nextNumber);
     }
     
     private WorkDTO convertToDTO(Work work) {
@@ -201,16 +512,19 @@ public class WorkController {
         dto.setStatus(work.getStatus());
         dto.setCreatedAt(work.getCreatedAt());
         dto.setActivatedAt(work.getActivatedAt());
+        dto.setCompletedAt(work.getCompletedAt());
         dto.setLastUpdateAt(work.getLastUpdateAt());
         
-        // Get stages
         List<WorkStage> stages = workStageRepository.findByWorkIdOrderByIdAsc(work.getId());
-        List<WorkStageDTO> stageDTOs = stages.stream().map(this::convertStageToDTO).collect(Collectors.toList());
+        List<WorkStageDTO> stageDTOs = stages.stream()
+                .map(this::convertStageToDTO)
+                .collect(Collectors.toList());
         dto.setStages(stageDTOs);
         
-        // Get progress updates
         List<WorkProgressUpdate> updates = workProgressUpdateRepository.findByWorkIdOrderByUpdatedAtDesc(work.getId());
-        List<WorkProgressUpdateDTO> updateDTOs = updates.stream().map(this::convertUpdateToDTO).collect(Collectors.toList());
+        List<WorkProgressUpdateDTO> updateDTOs = updates.stream()
+                .map(this::convertUpdateToDTO)
+                .collect(Collectors.toList());
         dto.setProgressUpdates(updateDTOs);
         
         return dto;
@@ -245,19 +559,18 @@ public class WorkController {
         dto.setTotalCost(update.getTotalCost());
         dto.setUpdatedAt(update.getUpdatedAt());
         
-        // Get stage name
         if (update.getStageId() != null) {
             workStageRepository.findById(update.getStageId())
                     .ifPresent(stage -> dto.setStageName(stage.getName()));
         }
         
-        // Get user name
         userRepository.findById(update.getUpdatedById())
                 .ifPresent(user -> dto.setUpdatedBy(user.getName()));
         
-        // Get photos
         List<WorkProgressPhoto> photos = workProgressPhotoRepository.findByProgressUpdateId(update.getId());
-        dto.setPhotoUrls(photos.stream().map(WorkProgressPhoto::getPhotoUrl).collect(Collectors.toList()));
+        dto.setPhotoUrls(photos.stream()
+                .map(WorkProgressPhoto::getPhotoUrl)
+                .collect(Collectors.toList()));
         
         return dto;
     }

@@ -10,18 +10,16 @@ import java.util.Optional;
 
 public interface WorkRepository extends JpaRepository<Work, Long> {
     
-    // Basic finders
     Optional<Work> findByWorkCode(String workCode);
     
     List<Work> findBySchoolId(Long schoolId);
     
+    @Query("SELECT w FROM Work w WHERE w.schoolId = :schoolId ORDER BY w.createdAt DESC")
+    List<Work> findBySchoolIdOrderByCreatedAtDesc(@Param("schoolId") Long schoolId);
+    
     List<Work> findBySchoolIdAndStatus(Long schoolId, String status);
     
     List<Work> findByStatus(String status);
-    
-    // Custom queries with ordering
-    @Query("SELECT w FROM Work w WHERE w.schoolId = :schoolId ORDER BY w.createdAt DESC")
-    List<Work> findBySchoolIdOrderByCreatedAtDesc(@Param("schoolId") Long schoolId);
     
     @Query("SELECT w FROM Work w WHERE w.status = :status ORDER BY w.createdAt DESC")
     List<Work> findByStatusOrderByCreatedAtDesc(@Param("status") String status);
@@ -29,19 +27,16 @@ public interface WorkRepository extends JpaRepository<Work, Long> {
     @Query("SELECT w FROM Work w WHERE w.workRequestId = :requestId")
     Optional<Work> findByWorkRequestId(@Param("requestId") Long requestId);
     
-    // Find works with no recent updates
     @Query("SELECT w FROM Work w WHERE w.status = 'ACTIVE' AND w.lastUpdateAt < :date")
     List<Work> findWorksWithNoRecentUpdate(@Param("date") LocalDateTime date);
     
-    @Query("SELECT w FROM Work w WHERE w.status = 'ACTIVE' AND w.lastUpdateAt IS NULL AND w.createdAt < :date")
-    List<Work> findActiveWorksWithNoUpdates(@Param("date") LocalDateTime date);
+    boolean existsByWorkCode(String workCode);
     
-    // Count queries
+    @Query("SELECT MAX(w.workCode) FROM Work w WHERE w.workCode LIKE :prefix%")
+    String findMaxWorkCodeByPrefix(@Param("prefix") String prefix);
+    
     long countBySchoolIdAndStatus(Long schoolId, String status);
     
-    @Query("SELECT COUNT(w) FROM Work w WHERE w.schoolId = :schoolId AND w.status = 'ACTIVE'")
-    long countActiveWorksBySchoolId(@Param("schoolId") Long schoolId);
-    
-    @Query("SELECT COUNT(w) FROM Work w WHERE w.schoolId = :schoolId AND w.status = 'COMPLETED'")
-    long countCompletedWorksBySchoolId(@Param("schoolId") Long schoolId);
+    @Query("SELECT w FROM Work w WHERE w.createdAt BETWEEN :startDate AND :endDate ORDER BY w.createdAt DESC")
+    List<Work> findByCreatedAtBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 }

@@ -9,6 +9,7 @@ import com.esspbackend.entity.User;
 import com.esspbackend.repository.SchoolRepository;
 import com.esspbackend.repository.TalukaRepository;
 import com.esspbackend.repository.UserRepository;
+import com.esspbackend.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,9 @@ public class AdminUserController {
 
     @Autowired
     private SchoolRepository schoolRepository;
+
+    @Autowired
+    private AuditLogService auditLogService;
 
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
 
@@ -92,6 +96,10 @@ public class AdminUserController {
             user.setIsDeleted(false);
             
             User savedUser = userRepository.save(user);
+
+            // Log user creation
+            auditLogService.log("USER_CREATION", "New user created: " + savedUser.getName() + " (" + savedUser.getRole() + ")", null, "Admin", "ADMIN");
+
             return ResponseEntity.ok(convertToDTO(savedUser));
         } catch (Exception e) {
             e.printStackTrace();
@@ -136,7 +144,12 @@ public class AdminUserController {
                             user.setPassword(userDetails.getPassword());
                         }
                         
-                        return ResponseEntity.ok(convertToDTO(userRepository.save(user)));
+                        User updatedUser = userRepository.save(user);
+
+                        // Log user update
+                        auditLogService.log("USER_UPDATE", "User updated: " + updatedUser.getName(), null, "Admin", "ADMIN");
+
+                        return ResponseEntity.ok(convertToDTO(updatedUser));
                     } catch (Exception e) {
                         Map<String, String> errorResponse = new HashMap<>();
                         errorResponse.put("error", "Failed to update user: " + e.getMessage());
@@ -157,6 +170,10 @@ public class AdminUserController {
                             newPassword = user.getMobileNumber();
                         }
                         userRepository.resetPassword(id, newPassword);
+
+                        // Log password reset
+                        auditLogService.log("PASSWORD_RESET", "Password reset for user: " + user.getName(), null, "Admin", "ADMIN");
+
                         Map<String, String> response = new HashMap<>();
                         response.put("message", "Password reset successfully");
                         return ResponseEntity.ok(response);
@@ -176,6 +193,10 @@ public class AdminUserController {
                 .map(user -> {
                     try {
                         userRepository.updateStatus(id, "Active");
+
+                        // Log activation
+                        auditLogService.log("USER_ACTIVATE", "User activated: " + user.getName(), null, "Admin", "ADMIN");
+
                         Map<String, String> response = new HashMap<>();
                         response.put("message", "User activated successfully");
                         return ResponseEntity.ok(response);
@@ -195,6 +216,10 @@ public class AdminUserController {
                 .map(user -> {
                     try {
                         userRepository.updateStatus(id, "Inactive");
+
+                        // Log deactivation
+                        auditLogService.log("USER_DEACTIVATE", "User deactivated: " + user.getName(), null, "Admin", "ADMIN");
+
                         Map<String, String> response = new HashMap<>();
                         response.put("message", "User deactivated successfully");
                         return ResponseEntity.ok(response);
@@ -214,6 +239,10 @@ public class AdminUserController {
                 .map(user -> {
                     try {
                         userRepository.softDelete(id);
+
+                        // Log deletion
+                        auditLogService.log("USER_DELETE", "User deleted (soft): " + user.getName(), null, "Admin", "ADMIN");
+
                         Map<String, String> response = new HashMap<>();
                         response.put("message", "User deleted successfully");
                         return ResponseEntity.ok(response);

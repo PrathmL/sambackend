@@ -2,7 +2,7 @@ package com.esspbackend.controller;
 
 import com.esspbackend.entity.Taluka;
 import com.esspbackend.repository.TalukaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.esspbackend.service.AuditLogService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,8 +13,13 @@ import java.util.List;
 @CrossOrigin(origins = "http://localhost:3000")
 public class TalukaController {
 
-    @Autowired
-    private TalukaRepository talukaRepository;
+    private final TalukaRepository talukaRepository;
+    private final AuditLogService auditLogService;
+
+    public TalukaController(TalukaRepository talukaRepository, AuditLogService auditLogService) {
+        this.talukaRepository = talukaRepository;
+        this.auditLogService = auditLogService;
+    }
 
     @GetMapping
     public List<Taluka> getAllTalukas() {
@@ -23,7 +28,9 @@ public class TalukaController {
 
     @PostMapping
     public Taluka createTaluka(@RequestBody Taluka taluka) {
-        return talukaRepository.save(taluka);
+        Taluka saved = talukaRepository.save(taluka);
+        auditLogService.log("TALUKA_CREATE", "New taluka created: " + saved.getName(), null, "Admin", "ADMIN");
+        return saved;
     }
 
     @GetMapping("/{id}")
@@ -41,7 +48,9 @@ public class TalukaController {
                     taluka.setDistrict(talukaDetails.getDistrict());
                     taluka.setCode(talukaDetails.getCode());
                     taluka.setStatus(talukaDetails.getStatus());
-                    return ResponseEntity.ok(talukaRepository.save(taluka));
+                    Taluka updated = talukaRepository.save(taluka);
+                    auditLogService.log("TALUKA_UPDATE", "Taluka updated: " + updated.getName(), null, "Admin", "ADMIN");
+                    return ResponseEntity.ok(updated);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -50,7 +59,9 @@ public class TalukaController {
     public ResponseEntity<Void> deleteTaluka(@PathVariable Long id) {
         return talukaRepository.findById(id)
                 .map(taluka -> {
+                    String name = taluka.getName();
                     talukaRepository.delete(taluka);
+                    auditLogService.log("TALUKA_DELETE", "Taluka deleted: " + name, null, "Admin", "ADMIN");
                     return ResponseEntity.ok().<Void>build();
                 })
                 .orElse(ResponseEntity.notFound().build());

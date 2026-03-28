@@ -6,6 +6,7 @@ import com.esspbackend.dto.WorkProgressUpdateDTO;
 import com.esspbackend.dto.WorkStageDTO;
 import com.esspbackend.entity.*;
 import com.esspbackend.repository.*;
+import com.esspbackend.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +49,9 @@ public class WorkController {
     
     @Autowired
     private FundSourceRepository fundSourceRepository;
+
+    @Autowired
+    private AuditLogService auditLogService;
 
     private final String UPLOAD_DIR = "uploads/work-progress/";
 
@@ -207,6 +211,9 @@ public class WorkController {
             work.setLastUpdateAt(LocalDateTime.now());
             
             Work savedWork = workRepository.save(work);
+
+            // Log work creation
+            auditLogService.log("WORK_ACTIVATION", "New official work created: " + savedWork.getTitle() + " (" + savedWork.getWorkCode() + ")", null, "Admin", "ADMIN");
             
             // Create stages
             List<WorkStage> stages = new ArrayList<>();
@@ -275,6 +282,10 @@ public class WorkController {
             work.setLastUpdateAt(LocalDateTime.now());
             
             Work saved = workRepository.save(work);
+
+            // Log work creation
+            auditLogService.log("WORK_CREATE", "Manual work created: " + saved.getTitle(), null, "Admin", "ADMIN");
+
             return ResponseEntity.ok(convertToDTO(saved));
         } catch (Exception e) {
             Map<String, String> error = new HashMap<>();
@@ -319,6 +330,11 @@ public class WorkController {
             update.setUpdatedByRole(updatedByRole);
             
             WorkProgressUpdate savedUpdate = workProgressUpdateRepository.save(update);
+
+            // Log progress update
+            userRepository.findById(updatedById).ifPresent(user -> {
+                auditLogService.log("WORK_PROGRESS_UPDATE", "Progress updated for: " + work.getTitle() + " (" + progressPercentage + "%)", user.getId(), user.getName(), user.getRole().name());
+            });
             
             if (photos != null && photos.length > 0) {
                 for (int i = 0; i < photos.length; i++) {
@@ -401,6 +417,10 @@ public class WorkController {
                     work.setType(workDetails.getType());
                     work.setSanctionedAmount(workDetails.getSanctionedAmount());
                     Work updated = workRepository.save(work);
+
+                    // Log work update
+                    auditLogService.log("WORK_UPDATE", "Work details updated: " + updated.getTitle(), null, "Admin", "ADMIN");
+
                     return ResponseEntity.ok(convertToDTO(updated));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -416,6 +436,9 @@ public class WorkController {
                     work.setActivatedAt(LocalDateTime.now());
                     work.setLastUpdateAt(LocalDateTime.now());
                     workRepository.save(work);
+
+                    // Log activation
+                    auditLogService.log("WORK_ACTIVATION", "Work activated: " + work.getTitle(), null, "Admin", "ADMIN");
                     
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Work activated successfully");
@@ -430,6 +453,9 @@ public class WorkController {
                 .map(work -> {
                     work.setStatus("ON_HOLD");
                     workRepository.save(work);
+
+                    // Log suspension
+                    auditLogService.log("WORK_SUSPEND", "Work suspended: " + work.getTitle(), null, "Admin", "ADMIN");
                     
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Work suspended: " + body.getOrDefault("reason", "No reason provided"));
@@ -444,6 +470,9 @@ public class WorkController {
                 .map(work -> {
                     work.setStatus("ACTIVE");
                     workRepository.save(work);
+
+                    // Log resume
+                    auditLogService.log("WORK_RESUME", "Work resumed: " + work.getTitle(), null, "Admin", "ADMIN");
                     
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Work resumed");
@@ -479,6 +508,9 @@ public class WorkController {
                     work.setStatus("PENDING_CLOSURE");
                     work.setCompletedAt(LocalDateTime.now());
                     workRepository.save(work);
+
+                    // Log completion
+                    auditLogService.log("WORK_COMPLETE_REQUEST", "Work marked as complete: " + work.getTitle(), null, "HM/Sachiv", "USER");
                     
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Work marked as complete. Awaiting Sachiv verification.");
@@ -499,6 +531,9 @@ public class WorkController {
                     
                     work.setStatus("COMPLETED");
                     workRepository.save(work);
+
+                    // Log verification
+                    auditLogService.log("WORK_VERIFIED", "Work verified and closed: " + work.getTitle(), null, "Sachiv", "SACHIV");
                     
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Work verified and closed successfully");
@@ -515,6 +550,10 @@ public class WorkController {
                 .map(work -> {
                     work.setStatus("DELETED");
                     workRepository.save(work);
+
+                    // Log deletion
+                    auditLogService.log("WORK_DELETE", "Work deleted: " + work.getTitle(), null, "Admin", "ADMIN");
+
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Work deleted successfully");
                     return ResponseEntity.ok(response);

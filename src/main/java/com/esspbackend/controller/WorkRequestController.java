@@ -4,6 +4,7 @@ import com.esspbackend.dto.QuotationDTO;
 import com.esspbackend.dto.WorkRequestDTO;
 import com.esspbackend.entity.*;
 import com.esspbackend.repository.*;
+import com.esspbackend.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +42,9 @@ public class WorkRequestController {
     @Autowired
     private AlertRepository alertRepository;
 
+    @Autowired
+    private AuditLogService auditLogService;
+
     private final String UPLOAD_DIR = "uploads/work-requests/";
 
     // Create new work request with photos
@@ -74,6 +78,11 @@ public class WorkRequestController {
             workRequest.setStatus(WorkRequestStatus.PENDING_QUOTATION);
             
             WorkRequest savedRequest = workRequestRepository.save(workRequest);
+
+            // Log work request creation
+            userRepository.findById(createdById).ifPresent(user -> {
+                auditLogService.log("WORK_REQUEST_CREATE", "New work request submitted: " + title, user.getId(), user.getName(), user.getRole().name());
+            });
             
             // Create Alert for Clerk
             Alert alert = new Alert();
@@ -179,6 +188,9 @@ public class WorkRequestController {
                     request.setStatus(WorkRequestStatus.APPROVED);
                     request.setApprovedAt(LocalDateTime.now());
                     workRequestRepository.save(request);
+
+                    // Log approval
+                    auditLogService.log("WORK_REQUEST_APPROVE", "Work request approved: " + request.getTitle(), null, "Admin", "ADMIN");
                     
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Work request approved successfully");
@@ -196,6 +208,9 @@ public class WorkRequestController {
                     request.setRejectedAt(LocalDateTime.now());
                     request.setRejectionReason(body.get("reason"));
                     workRequestRepository.save(request);
+
+                    // Log rejection
+                    auditLogService.log("WORK_REQUEST_REJECT", "Work request rejected: " + request.getTitle(), null, "Admin", "ADMIN");
                     
                     Map<String, String> response = new HashMap<>();
                     response.put("message", "Work request rejected");

@@ -71,6 +71,9 @@ public class WorkController {
     private AlertRepository alertRepository;
 
     @Autowired
+    private HandoverCertificateRepository handoverCertificateRepository;
+
+    @Autowired
     private AuditLogService auditLogService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -477,15 +480,12 @@ public class WorkController {
             }
             
             work.setLastUpdateAt(LocalDateTime.now());
-            
-            if (work.getProgressPercentage() != null && work.getProgressPercentage() >= 100) {
-                work.setStatus("COMPLETED");
-                work.setCompletedAt(LocalDateTime.now());
-            } else if (work.getProgressPercentage() != null && work.getProgressPercentage() > 0) {
+
+            if (work.getStatus().equals("ACTIVE")) {
                 work.setStatus("IN_PROGRESS");
             }
-            
-            workRepository.save(work);
+
+            Work savedWork = workRepository.save(work);
             
             Map<String, String> response = new HashMap<>();
             response.put("message", "Progress updated successfully");
@@ -690,6 +690,9 @@ public class WorkController {
         dto.setCompletedAt(work.getCompletedAt());
         dto.setLastUpdateAt(work.getLastUpdateAt());
         dto.setInternalNotes(work.getInternalNotes());
+        
+        // Check if certificate exists
+        dto.setHasCertificate(handoverCertificateRepository.findByWorkId(work.getId()).isPresent());
         
         // Get school name
         schoolRepository.findById(work.getSchoolId()).ifPresent(school -> {

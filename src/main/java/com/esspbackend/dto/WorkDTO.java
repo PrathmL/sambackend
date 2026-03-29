@@ -21,6 +21,7 @@ public class WorkDTO {
     private LocalDateTime completedAt;
     private LocalDateTime lastUpdateAt;
     private String internalNotes;
+    private Boolean hasCertificate;
     private List<PhotoDTO> photoUrls;
     private List<WorkStageDTO> stages;
     private List<WorkProgressUpdateDTO> progressUpdates;
@@ -78,6 +79,9 @@ public class WorkDTO {
     
     public String getInternalNotes() { return internalNotes; }
     public void setInternalNotes(String internalNotes) { this.internalNotes = internalNotes; }
+
+    public Boolean getHasCertificate() { return hasCertificate; }
+    public void setHasCertificate(Boolean hasCertificate) { this.hasCertificate = hasCertificate; }
 
     public List<PhotoDTO> getPhotoUrls() { return photoUrls; }
     public void setPhotoUrls(List<PhotoDTO> photoUrls) { this.photoUrls = photoUrls; }

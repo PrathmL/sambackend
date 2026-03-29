@@ -17,7 +17,7 @@ public class WorkProgressUpdateDTO {
     private Double totalCost;
     private String updatedBy;
     private LocalDateTime updatedAt;
-    private List<String> photoUrls;
+    private List<PhotoDTO> photoUrls;
     private List<WorkProgressItemUsage> itemUsage;
 
     public WorkProgressUpdateDTO() {}
@@ -59,8 +59,8 @@ public class WorkProgressUpdateDTO {
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     
-    public List<String> getPhotoUrls() { return photoUrls; }
-    public void setPhotoUrls(List<String> photoUrls) { this.photoUrls = photoUrls; }
+    public List<PhotoDTO> getPhotoUrls() { return photoUrls; }
+    public void setPhotoUrls(List<PhotoDTO> photoUrls) { this.photoUrls = photoUrls; }
 
     public List<WorkProgressItemUsage> getItemUsage() { return itemUsage; }
     public void setItemUsage(List<WorkProgressItemUsage> itemUsage) { this.itemUsage = itemUsage; }

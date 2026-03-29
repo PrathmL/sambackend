@@ -2,6 +2,7 @@ package com.esspbackend.controller;
 
 import com.esspbackend.dto.QuotationDTO;
 import com.esspbackend.dto.WorkRequestDTO;
+import com.esspbackend.dto.PhotoDTO;
 import com.esspbackend.entity.*;
 import com.esspbackend.repository.*;
 import com.esspbackend.service.AuditLogService;
@@ -259,7 +260,9 @@ public class WorkRequestController {
         
         // Get photos
         List<WorkRequestPhoto> photos = workRequestPhotoRepository.findByWorkRequestIdOrderByOrderIndexAsc(request.getId());
-        dto.setPhotoUrls(photos.stream().map(WorkRequestPhoto::getPhotoUrl).collect(Collectors.toList()));
+        dto.setPhotoUrls(photos.stream()
+                .map(p -> new PhotoDTO(p.getPhotoUrl(), p.getCaption(), p.getLatitude(), p.getLongitude()))
+                .collect(Collectors.toList()));
         
         // Get quotation if exists
         quotationRepository.findByWorkRequestId(request.getId()).ifPresent(quotation -> {

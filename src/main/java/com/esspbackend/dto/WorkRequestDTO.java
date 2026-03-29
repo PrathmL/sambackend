@@ -19,7 +19,7 @@ public class WorkRequestDTO {
     private LocalDateTime approvedAt;
     private LocalDateTime rejectedAt;
     private LocalDateTime createdAt;
-    private List<String> photoUrls;
+    private List<PhotoDTO> photoUrls;
     private QuotationDTO quotation;
 
     // Constructors
@@ -56,8 +56,8 @@ public class WorkRequestDTO {
     public void setRejectedAt(LocalDateTime rejectedAt) { this.rejectedAt = rejectedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    public List<String> getPhotoUrls() { return photoUrls; }
-    public void setPhotoUrls(List<String> photoUrls) { this.photoUrls = photoUrls; }
+    public List<PhotoDTO> getPhotoUrls() { return photoUrls; }
+    public void setPhotoUrls(List<PhotoDTO> photoUrls) { this.photoUrls = photoUrls; }
     public QuotationDTO getQuotation() { return quotation; }
     public void setQuotation(QuotationDTO quotation) { this.quotation = quotation; }
 }

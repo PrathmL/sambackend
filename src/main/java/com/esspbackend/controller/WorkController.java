@@ -4,6 +4,7 @@ import com.esspbackend.dto.WorkCreationRequest;
 import com.esspbackend.dto.WorkDTO;
 import com.esspbackend.dto.WorkProgressUpdateDTO;
 import com.esspbackend.dto.WorkStageDTO;
+import com.esspbackend.dto.PhotoDTO;
 import com.esspbackend.entity.*;
 import com.esspbackend.repository.*;
 import com.esspbackend.service.AuditLogService;
@@ -699,7 +700,7 @@ public class WorkController {
         if (work.getWorkRequestId() != null) {
             List<WorkRequestPhoto> requestPhotos = workRequestPhotoRepository.findByWorkRequestIdOrderByOrderIndexAsc(work.getWorkRequestId());
             dto.setPhotoUrls(requestPhotos.stream()
-                    .map(WorkRequestPhoto::getPhotoUrl)
+                    .map(p -> new PhotoDTO(p.getPhotoUrl(), p.getCaption(), p.getLatitude(), p.getLongitude()))
                     .collect(Collectors.toList()));
         }
         
@@ -757,7 +758,7 @@ public class WorkController {
         
         List<WorkProgressPhoto> photos = workProgressPhotoRepository.findByProgressUpdateId(update.getId());
         dto.setPhotoUrls(photos.stream()
-                .map(WorkProgressPhoto::getPhotoUrl)
+                .map(p -> new PhotoDTO(p.getPhotoUrl(), p.getCaption(), p.getGeoLocation()))
                 .collect(Collectors.toList()));
         
         dto.setItemUsage(workProgressItemUsageRepository.findByWorkProgressUpdateId(update.getId()));

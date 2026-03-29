@@ -344,7 +344,9 @@ public class WorkController {
             @RequestParam("updatedById") Long updatedById,
             @RequestParam("updatedByRole") String updatedByRole,
             @RequestParam(value = "itemUsage", required = false) String itemUsageJson,
-            @RequestParam(value = "photos", required = false) MultipartFile[] photos) {
+            @RequestParam(value = "photos", required = false) MultipartFile[] photos,
+            @RequestParam(value = "latitudes", required = false) Double[] latitudes,
+            @RequestParam(value = "longitudes", required = false) Double[] longitudes) {
         
         try {
             Path uploadPath = Paths.get(UPLOAD_DIR);
@@ -423,6 +425,12 @@ public class WorkController {
                     WorkProgressPhoto progressPhoto = new WorkProgressPhoto();
                     progressPhoto.setProgressUpdateId(savedUpdate.getId());
                     progressPhoto.setPhotoUrl("/uploads/work-progress/" + fileName);
+                    
+                    // Save geotag if available
+                    if (latitudes != null && latitudes.length > i && longitudes != null && longitudes.length > i) {
+                        progressPhoto.setGeoLocation(latitudes[i] + "," + longitudes[i]);
+                    }
+                    
                     workProgressPhotoRepository.save(progressPhoto);
                 }
             }

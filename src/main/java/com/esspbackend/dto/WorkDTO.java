@@ -9,6 +9,7 @@ public class WorkDTO {
     private String title;
     private String description;
     private String type;
+    private Long workRequestId;
     private Long schoolId;
     private String schoolName;
     private Double sanctionedAmount;
@@ -20,6 +21,7 @@ public class WorkDTO {
     private LocalDateTime completedAt;
     private LocalDateTime lastUpdateAt;
     private String internalNotes;
+    private List<String> photoUrls;
     private List<WorkStageDTO> stages;
     private List<WorkProgressUpdateDTO> progressUpdates;
 
@@ -40,6 +42,9 @@ public class WorkDTO {
     
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
+    
+    public Long getWorkRequestId() { return workRequestId; }
+    public void setWorkRequestId(Long workRequestId) { this.workRequestId = workRequestId; }
     
     public Long getSchoolId() { return schoolId; }
     public void setSchoolId(Long schoolId) { this.schoolId = schoolId; }
@@ -73,6 +78,9 @@ public class WorkDTO {
     
     public String getInternalNotes() { return internalNotes; }
     public void setInternalNotes(String internalNotes) { this.internalNotes = internalNotes; }
+
+    public List<String> getPhotoUrls() { return photoUrls; }
+    public void setPhotoUrls(List<String> photoUrls) { this.photoUrls = photoUrls; }
     
     public List<WorkStageDTO> getStages() { return stages; }
     public void setStages(List<WorkStageDTO> stages) { this.stages = stages; }

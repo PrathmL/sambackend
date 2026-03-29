@@ -58,7 +58,9 @@ public class WorkRequestController {
             @RequestParam("schoolId") Long schoolId,
             @RequestParam("createdById") Long createdById,
             @RequestParam(value = "expectedTimeline", required = false) String expectedTimeline,
-            @RequestParam(value = "photos", required = false) MultipartFile[] photos) {
+            @RequestParam(value = "photos", required = false) MultipartFile[] photos,
+            @RequestParam(value = "latitudes", required = false) Double[] latitudes,
+            @RequestParam(value = "longitudes", required = false) Double[] longitudes) {
         
         try {
             // Create directory if not exists
@@ -109,6 +111,15 @@ public class WorkRequestController {
                     workRequestPhoto.setWorkRequestId(savedRequest.getId());
                     workRequestPhoto.setPhotoUrl("/uploads/work-requests/" + fileName);
                     workRequestPhoto.setOrderIndex(i);
+                    
+                    // Set Geotags if available
+                    if (latitudes != null && i < latitudes.length) {
+                        workRequestPhoto.setLatitude(latitudes[i]);
+                    }
+                    if (longitudes != null && i < longitudes.length) {
+                        workRequestPhoto.setLongitude(longitudes[i]);
+                    }
+                    
                     workRequestPhotoRepository.save(workRequestPhoto);
                 }
             }

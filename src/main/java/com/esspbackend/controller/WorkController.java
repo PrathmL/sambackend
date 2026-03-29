@@ -47,6 +47,9 @@ public class WorkController {
     
     @Autowired
     private WorkRequestRepository workRequestRepository;
+
+    @Autowired
+    private WorkRequestPhotoRepository workRequestPhotoRepository;
     
     @Autowired
     private FundSourceRepository fundSourceRepository;
@@ -667,6 +670,7 @@ public class WorkController {
         dto.setTitle(work.getTitle());
         dto.setDescription(work.getDescription());
         dto.setType(work.getType());
+        dto.setWorkRequestId(work.getWorkRequestId());
         dto.setSchoolId(work.getSchoolId());
         dto.setSanctionedAmount(work.getSanctionedAmount());
         dto.setTotalUtilized(work.getTotalUtilized());
@@ -682,6 +686,14 @@ public class WorkController {
         schoolRepository.findById(work.getSchoolId()).ifPresent(school -> {
             dto.setSchoolName(school.getName());
         });
+
+        // Get initial photos from work request
+        if (work.getWorkRequestId() != null) {
+            List<WorkRequestPhoto> requestPhotos = workRequestPhotoRepository.findByWorkRequestIdOrderByOrderIndexAsc(work.getWorkRequestId());
+            dto.setPhotoUrls(requestPhotos.stream()
+                    .map(WorkRequestPhoto::getPhotoUrl)
+                    .collect(Collectors.toList()));
+        }
         
         List<WorkStage> stages = workStageRepository.findByWorkIdOrderByIdAsc(work.getId());
         List<WorkStageDTO> stageDTOs = stages.stream()

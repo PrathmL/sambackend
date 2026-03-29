@@ -20,6 +20,9 @@ public class WorkRequestPhoto {
     @Column(name = "order_index")
     private Integer orderIndex;
 
+    private Double latitude;
+    private Double longitude;
+
     public WorkRequestPhoto() {}
 
     public Long getId() { return id; }
@@ -32,4 +35,8 @@ public class WorkRequestPhoto {
     public void setCaption(String caption) { this.caption = caption; }
     public Integer getOrderIndex() { return orderIndex; }
     public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex; }
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
 }

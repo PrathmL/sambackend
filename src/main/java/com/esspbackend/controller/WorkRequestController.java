@@ -57,6 +57,7 @@ public class WorkRequestController {
             @RequestParam("priority") String priority,
             @RequestParam("schoolId") Long schoolId,
             @RequestParam("createdById") Long createdById,
+            @RequestParam(value = "expectedTimeline", required = false) String expectedTimeline,
             @RequestParam(value = "photos", required = false) MultipartFile[] photos) {
         
         try {
@@ -75,6 +76,7 @@ public class WorkRequestController {
             workRequest.setPriority(priority);
             workRequest.setSchoolId(schoolId);
             workRequest.setCreatedById(createdById);
+            workRequest.setExpectedTimeline(expectedTimeline);
             workRequest.setStatus(WorkRequestStatus.PENDING_QUOTATION);
             
             WorkRequest savedRequest = workRequestRepository.save(workRequest);
@@ -182,11 +184,14 @@ public class WorkRequestController {
     
     // Approve work request
     @PostMapping("/{id}/approve")
-    public ResponseEntity<?> approveRequest(@PathVariable Long id) {
+    public ResponseEntity<?> approveRequest(@PathVariable Long id, @RequestBody(required = false) Map<String, String> body) {
         return workRequestRepository.findById(id)
                 .map(request -> {
                     request.setStatus(WorkRequestStatus.APPROVED);
                     request.setApprovedAt(LocalDateTime.now());
+                    if (body != null && body.containsKey("remarks")) {
+                        request.setAdminRemarks(body.get("remarks"));
+                    }
                     workRequestRepository.save(request);
 
                     // Log approval
@@ -207,6 +212,7 @@ public class WorkRequestController {
                     request.setStatus(WorkRequestStatus.REJECTED);
                     request.setRejectedAt(LocalDateTime.now());
                     request.setRejectionReason(body.get("reason"));
+                    request.setAdminRemarks(body.get("reason")); // Also store in adminRemarks for consistency if needed
                     workRequestRepository.save(request);
 
                     // Log rejection
@@ -230,6 +236,8 @@ public class WorkRequestController {
         dto.setSchoolId(request.getSchoolId());
         dto.setStatus(request.getStatus().name());
         dto.setRejectionReason(request.getRejectionReason());
+        dto.setAdminRemarks(request.getAdminRemarks());
+        dto.setExpectedTimeline(request.getExpectedTimeline());
         dto.setApprovedAt(request.getApprovedAt());
         dto.setRejectedAt(request.getRejectedAt());
         dto.setCreatedAt(request.getCreatedAt());

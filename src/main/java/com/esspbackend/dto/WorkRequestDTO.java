@@ -14,6 +14,8 @@ public class WorkRequestDTO {
     private String schoolName;
     private String status;
     private String rejectionReason;
+    private String adminRemarks;
+    private String expectedTimeline;
     private LocalDateTime approvedAt;
     private LocalDateTime rejectedAt;
     private LocalDateTime createdAt;
@@ -44,6 +46,10 @@ public class WorkRequestDTO {
     public void setStatus(String status) { this.status = status; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public String getAdminRemarks() { return adminRemarks; }
+    public void setAdminRemarks(String adminRemarks) { this.adminRemarks = adminRemarks; }
+    public String getExpectedTimeline() { return expectedTimeline; }
+    public void setExpectedTimeline(String expectedTimeline) { this.expectedTimeline = expectedTimeline; }
     public LocalDateTime getApprovedAt() { return approvedAt; }
     public void setApprovedAt(LocalDateTime approvedAt) { this.approvedAt = approvedAt; }
     public LocalDateTime getRejectedAt() { return rejectedAt; }

@@ -28,6 +28,12 @@ public class WorkRequest {
     @Column(name = "created_by_id")
     private Long createdById;
 
+    @Column(name = "expected_timeline")
+    private String expectedTimeline;
+
+    @Column(name = "admin_remarks", columnDefinition = "TEXT")
+    private String adminRemarks;
+
     @Enumerated(EnumType.STRING)
     private WorkRequestStatus status;
 
@@ -93,6 +99,10 @@ public class WorkRequest {
     public void setSchoolId(Long schoolId) { this.schoolId = schoolId; }
     public Long getCreatedById() { return createdById; }
     public void setCreatedById(Long createdById) { this.createdById = createdById; }
+    public String getExpectedTimeline() { return expectedTimeline; }
+    public void setExpectedTimeline(String expectedTimeline) { this.expectedTimeline = expectedTimeline; }
+    public String getAdminRemarks() { return adminRemarks; }
+    public void setAdminRemarks(String adminRemarks) { this.adminRemarks = adminRemarks; }
     public WorkRequestStatus getStatus() { return status; }
     public void setStatus(WorkRequestStatus status) { this.status = status; }
     public String getRejectionReason() { return rejectionReason; }

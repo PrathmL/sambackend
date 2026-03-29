@@ -10,8 +10,11 @@ public class Quotation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "work_request_id", unique = true)
+    @Column(name = "work_request_id")
     private Long workRequestId;
+
+    @Column(name = "quotation_type")
+    private String quotationType = "WORK"; // WORK or REPLENISHMENT
 
     @Column(name = "school_id")
     private Long schoolId;
@@ -121,4 +124,7 @@ public class Quotation {
     
     public LocalDateTime getRejectedAt() { return rejectedAt; }
     public void setRejectedAt(LocalDateTime rejectedAt) { this.rejectedAt = rejectedAt; }
+
+    public String getQuotationType() { return quotationType; }
+    public void setQuotationType(String quotationType) { this.quotationType = quotationType; }
 }

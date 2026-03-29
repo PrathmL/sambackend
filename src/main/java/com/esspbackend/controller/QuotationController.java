@@ -2,11 +2,13 @@ package com.esspbackend.controller;
 
 import com.esspbackend.dto.QuotationDTO;
 import com.esspbackend.entity.Quotation;
+import com.esspbackend.entity.QuotationItem;
 import com.esspbackend.entity.WorkRequest;
 import com.esspbackend.entity.WorkRequestStatus;
 import com.esspbackend.entity.Alert;
 import com.esspbackend.entity.Role;
 import com.esspbackend.repository.QuotationRepository;
+import com.esspbackend.repository.QuotationItemRepository;
 import com.esspbackend.repository.WorkRequestRepository;
 import com.esspbackend.repository.AlertRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,9 @@ public class QuotationController {
     private QuotationRepository quotationRepository;
     
     @Autowired
+    private QuotationItemRepository quotationItemRepository;
+    
+    @Autowired
     private WorkRequestRepository workRequestRepository;
 
     @Autowired
@@ -44,11 +49,23 @@ public class QuotationController {
         return ResponseEntity.ok(dtos);
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<List<QuotationDTO>> getAllQuotations() {
+        List<Quotation> quotations = quotationRepository.findAll();
+        List<QuotationDTO> dtos = quotations.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
+    }
+
     @PostMapping
     public ResponseEntity<?> createQuotation(@RequestBody Map<String, Object> request) {
         try {
             // Extract data from request
-            Long workRequestId = Long.valueOf(request.get("workRequestId").toString());
+            Long workRequestId = request.get("workRequestId") != null ? 
+                    Long.valueOf(request.get("workRequestId").toString()) : null;
+            String quotationType = request.containsKey("quotationType") ? 
+                    (String) request.get("quotationType") : "WORK";
             Long schoolId = Long.valueOf(request.get("schoolId").toString());
             Long preparedById = Long.valueOf(request.get("preparedById").toString());
             
@@ -71,16 +88,27 @@ public class QuotationController {
                 validUntil = LocalDateTime.parse(request.get("validUntil").toString() + "T00:00:00");
             }
             
+            // Extract items if present
+            List<Map<String, Object>> itemsList = request.containsKey("items") ? 
+                    (List<Map<String, Object>>) request.get("items") : null;
+            
+            // Re-calculate material cost if items are provided
+            if (itemsList != null && !itemsList.isEmpty()) {
+                materialCost = 0.0;
+                for (Map<String, Object> itemMap : itemsList) {
+                    Double qty = Double.valueOf(itemMap.get("quantity").toString());
+                    Double price = Double.valueOf(itemMap.get("unitPrice").toString());
+                    materialCost += (qty * price);
+                }
+            }
+
             // Calculate grand total
             Double grandTotal = materialCost + laborCost + additionalCosts;
-            
-            // Check if work request exists
-            WorkRequest workRequest = workRequestRepository.findById(workRequestId)
-                    .orElseThrow(() -> new RuntimeException("Work request not found"));
             
             // Create quotation
             Quotation quotation = new Quotation();
             quotation.setWorkRequestId(workRequestId);
+            quotation.setQuotationType(quotationType);
             quotation.setSchoolId(schoolId);
             quotation.setPreparedById(preparedById);
             quotation.setMaterialCost(materialCost);
@@ -95,20 +123,40 @@ public class QuotationController {
             quotation.setSubmittedAt(LocalDateTime.now());
             
             Quotation saved = quotationRepository.save(quotation);
+
+            // Save items if present
+            if (itemsList != null && !itemsList.isEmpty()) {
+                for (Map<String, Object> itemMap : itemsList) {
+                    com.esspbackend.entity.QuotationItem item = new com.esspbackend.entity.QuotationItem();
+                    item.setQuotationId(saved.getId());
+                    if (itemMap.get("materialId") != null && !itemMap.get("materialId").toString().isEmpty()) {
+                        item.setMaterialId(Long.valueOf(itemMap.get("materialId").toString()));
+                    }
+                    item.setMaterialName(itemMap.get("materialName") != null ? itemMap.get("materialName").toString() : "");
+                    item.setQuantity(Double.valueOf(itemMap.get("quantity").toString()));
+                    item.setUnitPrice(Double.valueOf(itemMap.get("unitPrice").toString()));
+                    item.setTotalPrice(item.getQuantity() * item.getUnitPrice());
+                    quotationItemRepository.save(item);
+                }
+            }
             
             // Create Alert for Admin
             Alert alert = new Alert();
-            alert.setTitle("New Quotation Submitted");
-            alert.setMessage("A new quotation has been prepared for request #" + workRequestId + " and needs approval.");
+            alert.setTitle(quotationType.equals("WORK") ? "New Work Quotation" : "New Fund Request");
+            alert.setMessage("A new " + quotationType.toLowerCase() + " quotation has been prepared for school #" + schoolId + " and needs approval.");
             alert.setType("WARNING");
-            alert.setCategory("WORK_REQUEST");
+            alert.setCategory(quotationType.equals("WORK") ? "WORK_REQUEST" : "INVENTORY");
             alert.setRole(Role.ADMIN);
             alert.setRelatedId(saved.getId());
             alertRepository.save(alert);
             
-            // Update work request status
-            workRequest.setStatus(WorkRequestStatus.PENDING_APPROVAL);
-            workRequestRepository.save(workRequest);
+            // Update work request status if it's a work quotation
+            if (workRequestId != null) {
+                workRequestRepository.findById(workRequestId).ifPresent(wr -> {
+                    wr.setStatus(WorkRequestStatus.PENDING_APPROVAL);
+                    workRequestRepository.save(wr);
+                });
+            }
             
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Quotation submitted successfully");
@@ -173,6 +221,10 @@ public class QuotationController {
         dto.setSubmittedAt(quotation.getSubmittedAt());
         dto.setApprovedAt(quotation.getApprovedAt());
         dto.setRejectedAt(quotation.getRejectedAt());
+        
+        // Fetch items
+        dto.setItems(quotationItemRepository.findByQuotationId(quotation.getId()));
+        
         return dto;
     }
 }

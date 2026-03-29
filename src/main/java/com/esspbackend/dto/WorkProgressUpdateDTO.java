@@ -2,6 +2,7 @@ package com.esspbackend.dto;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.esspbackend.entity.WorkProgressItemUsage;
 
 public class WorkProgressUpdateDTO {
     private Long id;
@@ -17,6 +18,7 @@ public class WorkProgressUpdateDTO {
     private String updatedBy;
     private LocalDateTime updatedAt;
     private List<String> photoUrls;
+    private List<WorkProgressItemUsage> itemUsage;
 
     public WorkProgressUpdateDTO() {}
 
@@ -59,4 +61,7 @@ public class WorkProgressUpdateDTO {
     
     public List<String> getPhotoUrls() { return photoUrls; }
     public void setPhotoUrls(List<String> photoUrls) { this.photoUrls = photoUrls; }
+
+    public List<WorkProgressItemUsage> getItemUsage() { return itemUsage; }
+    public void setItemUsage(List<WorkProgressItemUsage> itemUsage) { this.itemUsage = itemUsage; }
 }

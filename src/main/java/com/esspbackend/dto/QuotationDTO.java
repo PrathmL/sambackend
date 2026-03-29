@@ -1,11 +1,14 @@
 package com.esspbackend.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import com.esspbackend.entity.QuotationItem;
 
 public class QuotationDTO {
     private Long id;
     private Long workRequestId;
     private Long schoolId;
+    private String quotationType;
     private Double materialCost;
     private Double laborCost;
     private Double additionalCosts;
@@ -19,6 +22,7 @@ public class QuotationDTO {
     private LocalDateTime submittedAt;
     private LocalDateTime approvedAt;
     private LocalDateTime rejectedAt;
+    private List<QuotationItem> items;
 
     public QuotationDTO() {}
 
@@ -31,6 +35,9 @@ public class QuotationDTO {
     
     public Long getSchoolId() { return schoolId; }
     public void setSchoolId(Long schoolId) { this.schoolId = schoolId; }
+
+    public String getQuotationType() { return quotationType; }
+    public void setQuotationType(String quotationType) { this.quotationType = quotationType; }
     
     public Double getMaterialCost() { return materialCost; }
     public void setMaterialCost(Double materialCost) { this.materialCost = materialCost; }
@@ -70,4 +77,7 @@ public class QuotationDTO {
     
     public LocalDateTime getRejectedAt() { return rejectedAt; }
     public void setRejectedAt(LocalDateTime rejectedAt) { this.rejectedAt = rejectedAt; }
+
+    public List<QuotationItem> getItems() { return items; }
+    public void setItems(List<QuotationItem> items) { this.items = items; }
 }

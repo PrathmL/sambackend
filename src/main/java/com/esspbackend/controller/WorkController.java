@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -51,7 +52,24 @@ public class WorkController {
     private FundSourceRepository fundSourceRepository;
 
     @Autowired
+    private QuotationRepository quotationRepository;
+
+    @Autowired
+    private QuotationItemRepository quotationItemRepository;
+
+    @Autowired
+    private WorkProgressItemUsageRepository workProgressItemUsageRepository;
+
+    @Autowired
+    private SchoolInventoryRepository schoolInventoryRepository;
+
+    @Autowired
+    private AlertRepository alertRepository;
+
+    @Autowired
     private AuditLogService auditLogService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final String UPLOAD_DIR = "uploads/work-progress/";
 
@@ -148,6 +166,12 @@ public class WorkController {
     public ResponseEntity<List<WorkProgressUpdate>> getProgressUpdates(@PathVariable Long id) {
         List<WorkProgressUpdate> updates = workProgressUpdateRepository.findByWorkIdOrderByUpdatedAtDesc(id);
         return ResponseEntity.ok(updates);
+    }
+
+    @GetMapping("/{id}/items")
+    public ResponseEntity<List<QuotationItem>> getWorkItems(@PathVariable Long id) {
+        List<QuotationItem> items = quotationItemRepository.findByWorkId(id);
+        return ResponseEntity.ok(items);
     }
 
     // ==================== CREATE ENDPOINTS ====================
@@ -248,6 +272,15 @@ public class WorkController {
             // Update work request status
             workRequest.setStatus(WorkRequestStatus.WORK_CREATED);
             workRequestRepository.save(workRequest);
+
+            // Link quotation items to this work
+            quotationRepository.findByWorkRequestId(request.getWorkRequestId()).ifPresent(quotation -> {
+                List<QuotationItem> qItems = quotationItemRepository.findByQuotationId(quotation.getId());
+                for (QuotationItem qItem : qItems) {
+                    qItem.setWorkId(savedWork.getId());
+                    quotationItemRepository.save(qItem);
+                }
+            });
             
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Work created and activated successfully");
@@ -307,6 +340,7 @@ public class WorkController {
             @RequestParam(value = "otherCost", required = false, defaultValue = "0") Double otherCost,
             @RequestParam("updatedById") Long updatedById,
             @RequestParam("updatedByRole") String updatedByRole,
+            @RequestParam(value = "itemUsage", required = false) String itemUsageJson,
             @RequestParam(value = "photos", required = false) MultipartFile[] photos) {
         
         try {
@@ -330,6 +364,46 @@ public class WorkController {
             update.setUpdatedByRole(updatedByRole);
             
             WorkProgressUpdate savedUpdate = workProgressUpdateRepository.save(update);
+
+            // Handle Item Usage and Inventory Update
+            if (itemUsageJson != null && !itemUsageJson.isEmpty()) {
+                List<Map<String, Object>> itemUsages = objectMapper.readValue(itemUsageJson, List.class);
+                for (Map<String, Object> usageMap : itemUsages) {
+                    Long materialId = usageMap.get("materialId") != null && !usageMap.get("materialId").toString().isEmpty() && !usageMap.get("materialId").toString().equals("null") ? 
+                            Long.valueOf(usageMap.get("materialId").toString()) : null;
+                    String materialName = usageMap.get("materialName") != null ? usageMap.get("materialName").toString() : "Unknown";
+                    Double qtyUsed = Double.valueOf(usageMap.get("quantityUsed").toString());
+                    
+                    WorkProgressItemUsage usage = new WorkProgressItemUsage();
+                    usage.setWorkProgressUpdateId(savedUpdate.getId());
+                    usage.setMaterialId(materialId);
+                    usage.setMaterialName(materialName);
+                    usage.setQuantityUsed(qtyUsed);
+                    workProgressItemUsageRepository.save(usage);
+                    
+                    // Update School Inventory only if materialId exists
+                    if (materialId != null) {
+                        schoolInventoryRepository.findBySchoolIdAndMaterialId(work.getSchoolId(), materialId)
+                                .ifPresent(inventory -> {
+                                    inventory.setCurrentQuantity(inventory.getCurrentQuantity() - qtyUsed);
+                                    schoolInventoryRepository.save(inventory);
+                                    
+                                    // Check for low stock alert
+                                    if (inventory.getCurrentQuantity() <= inventory.getReorderLevel()) {
+                                        Alert alert = new Alert();
+                                        alert.setTitle("Low Item Alert: " + materialName);
+                                        alert.setMessage("Item quantity is low for school #" + work.getSchoolId() + ". Current: " + inventory.getCurrentQuantity());
+                                        alert.setType("WARNING");
+                                        alert.setCategory("LOW_INVENTORY");
+                                        alert.setRole(Role.CLERK);
+                                        alert.setSchoolId(work.getSchoolId());
+                                        alert.setRelatedId(inventory.getId());
+                                        alertRepository.save(alert);
+                                    }
+                                });
+                    }
+                }
+            }
 
             // Log progress update
             userRepository.findById(updatedById).ifPresent(user -> {
@@ -356,42 +430,47 @@ public class WorkController {
             
             // If updating a specific stage, recalculate overall progress based on weights
             if (stageId != null) {
-                workStageRepository.findById(stageId).ifPresent(stage -> {
-                    stage.setProgressPercentage(progressPercentage);
-                    if (progressPercentage >= 100) {
-                        stage.setStatus("COMPLETED");
-                        stage.setCompletedAt(LocalDateTime.now());
-                        if (stage.getActualDurationDays() == null && stage.getStartedAt() != null) {
-                            long days = java.time.Duration.between(stage.getStartedAt(), LocalDateTime.now()).toDays();
-                            stage.setActualDurationDays((int) days);
-                        }
-                    } else if (progressPercentage > 0) {
-                        stage.setStatus("IN_PROGRESS");
-                        if (stage.getStartedAt() == null) {
-                            stage.setStartedAt(LocalDateTime.now());
-                        }
-                    }
-                    stage.setRemarks(remarks);
-                    workStageRepository.save(stage);
-                });
+                WorkStage stage = workStageRepository.findById(stageId)
+                        .orElseThrow(() -> new RuntimeException("Stage not found"));
                 
-                // Recalculate overall work progress: Sum of (stage_progress * stage_weightage / 100)
+                stage.setProgressPercentage(progressPercentage);
+                if (progressPercentage >= 100) {
+                    stage.setStatus("COMPLETED");
+                    stage.setCompletedAt(LocalDateTime.now());
+                    if (stage.getActualDurationDays() == null && stage.getStartedAt() != null) {
+                        long days = java.time.Duration.between(stage.getStartedAt(), LocalDateTime.now()).toDays();
+                        stage.setActualDurationDays((int) days);
+                    }
+                } else if (progressPercentage > 0) {
+                    stage.setStatus("IN_PROGRESS");
+                    if (stage.getStartedAt() == null) {
+                        stage.setStartedAt(LocalDateTime.now());
+                    }
+                }
+                stage.setRemarks(remarks);
+                workStageRepository.save(stage);
+                
+                // Recalculate overall work progress
                 List<WorkStage> allStages = workStageRepository.findByWorkId(workId);
                 double calculatedProgress = 0;
                 for (WorkStage s : allStages) {
-                    calculatedProgress += (s.getProgressPercentage() * s.getWeightage()) / 100.0;
+                    int sWeight = (s.getWeightage() != null) ? s.getWeightage() : 0;
+                    int sProgress = (s.getProgressPercentage() != null) ? s.getProgressPercentage() : 0;
+                    calculatedProgress += (sProgress * sWeight) / 100.0;
                 }
                 work.setProgressPercentage((int) Math.round(calculatedProgress));
             } else {
-                // If no stageId, maintain current behavior: set overall progress directly
+                // If no stageId, set overall progress directly
                 work.setProgressPercentage(progressPercentage);
             }
             
             work.setLastUpdateAt(LocalDateTime.now());
             
-            if (work.getProgressPercentage() >= 100) {
+            if (work.getProgressPercentage() != null && work.getProgressPercentage() >= 100) {
                 work.setStatus("COMPLETED");
                 work.setCompletedAt(LocalDateTime.now());
+            } else if (work.getProgressPercentage() != null && work.getProgressPercentage() > 0) {
+                work.setStatus("IN_PROGRESS");
             }
             
             workRepository.save(work);
@@ -660,6 +739,8 @@ public class WorkController {
         dto.setPhotoUrls(photos.stream()
                 .map(WorkProgressPhoto::getPhotoUrl)
                 .collect(Collectors.toList()));
+        
+        dto.setItemUsage(workProgressItemUsageRepository.findByWorkProgressUpdateId(update.getId()));
         
         return dto;
     }

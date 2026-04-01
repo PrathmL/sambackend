@@ -71,6 +71,9 @@ public class WorkController {
     private AlertRepository alertRepository;
 
     @Autowired
+    private StockMovementRepository stockMovementRepository;
+
+    @Autowired
     private HandoverCertificateRepository handoverCertificateRepository;
 
     @Autowired
@@ -396,6 +399,19 @@ public class WorkController {
                                 .ifPresent(inventory -> {
                                     inventory.setCurrentQuantity(inventory.getCurrentQuantity() - qtyUsed);
                                     schoolInventoryRepository.save(inventory);
+
+                                    // Record Stock Movement
+                                    StockMovement movement = new StockMovement();
+                                    movement.setSchoolId(work.getSchoolId());
+                                    movement.setMaterialId(materialId);
+                                    movement.setMovementType("OUT");
+                                    movement.setQuantity(qtyUsed);
+                                    movement.setWorkId(workId);
+                                    movement.setPurpose("Used in Work: " + work.getTitle());
+                                    movement.setRemarks("Reported in progress update by " + updatedByRole);
+                                    movement.setPerformedById(updatedById);
+                                    movement.setPerformedByRole(updatedByRole);
+                                    stockMovementRepository.save(movement);
                                     
                                     // Check for low stock alert
                                     if (inventory.getCurrentQuantity() <= inventory.getReorderLevel()) {
